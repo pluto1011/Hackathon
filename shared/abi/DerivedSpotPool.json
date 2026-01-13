@@ -1,0 +1,6 @@
+[
+  {"inputs":[],"name":"baseToken","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},
+  {"inputs":[],"name":"router","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},
+  {"inputs":[{"internalType":"uint256","name":"amountIn","type":"uint256"},{"internalType":"uint256","name":"minOut","type":"uint256"},{"internalType":"address","name":"to","type":"address"},{"internalType":"bool","name":"allowReserve","type":"bool"}],"name":"swapExactIn","outputs":[{"internalType":"uint256","name":"filledRwa","type":"uint256"},{"internalType":"uint256","name":"reservedStable","type":"uint256"}],"stateMutability":"nonpayable","type":"function"},
+  {"inputs":[{"internalType":"uint256","name":"amountIn","type":"uint256"}],"name":"quoteExactIn","outputs":[{"internalType":"uint256","name":"rwaOutQuote","type":"uint256"},{"internalType":"uint256","name":"rwaOutCap","type":"uint256"},{"internalType":"uint256","name":"stableAmount","type":"uint256"},{"internalType":"bool","name":"willReserve","type":"bool"}],"stateMutability":"view","type":"function"}
+]

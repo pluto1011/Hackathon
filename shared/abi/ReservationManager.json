@@ -1,0 +1,7 @@
+[
+  {"inputs":[],"name":"stable","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},
+  {"inputs":[{"internalType":"address","name":"","type":"address"}],"name":"reservedStable","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+  {"inputs":[{"internalType":"address","name":"user","type":"address"},{"internalType":"uint256","name":"stableAmount","type":"uint256"}],"name":"createReservation","outputs":[],"stateMutability":"nonpayable","type":"function"},
+  {"inputs":[],"name":"cancel","outputs":[],"stateMutability":"nonpayable","type":"function"},
+  {"inputs":[{"internalType":"address","name":"user","type":"address"},{"internalType":"uint256","name":"amount","type":"uint256"},{"internalType":"address","name":"to","type":"address"}],"name":"releaseStable","outputs":[],"stateMutability":"nonpayable","type":"function"}
+]

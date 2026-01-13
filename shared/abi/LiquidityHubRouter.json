@@ -1,0 +1,11 @@
+[
+  {"inputs":[],"name":"core","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},
+  {"inputs":[],"name":"reservations","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},
+  {"inputs":[],"name":"stable","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},
+  {"inputs":[],"name":"rwa","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},
+  {"inputs":[{"internalType":"address","name":"tokenIn","type":"address"},{"internalType":"uint256","name":"amountIn","type":"uint256"}],"name":"quoteToRwaExactIn","outputs":[{"internalType":"uint256","name":"rwaOutQuote","type":"uint256"},{"internalType":"uint256","name":"rwaOutCap","type":"uint256"},{"internalType":"uint256","name":"stableAmount","type":"uint256"},{"internalType":"bool","name":"willReserve","type":"bool"}],"stateMutability":"view","type":"function"},
+  {"inputs":[{"internalType":"address","name":"tokenIn","type":"address"},{"internalType":"uint256","name":"amountIn","type":"uint256"},{"internalType":"uint256","name":"minRwaOut","type":"uint256"},{"internalType":"address","name":"recipient","type":"address"},{"internalType":"bool","name":"allowReserve","type":"bool"}],"name":"swapToRwaExactIn","outputs":[{"internalType":"uint256","name":"filledRwa","type":"uint256"},{"internalType":"uint256","name":"reservedStable","type":"uint256"}],"stateMutability":"nonpayable","type":"function"},
+  {"inputs":[{"internalType":"uint256","name":"minRwaOut","type":"uint256"},{"internalType":"address","name":"recipient","type":"address"}],"name":"claimReservation","outputs":[{"internalType":"uint256","name":"filledRwa","type":"uint256"}],"stateMutability":"nonpayable","type":"function"},
+  {"inputs":[],"name":"cancelReservation","outputs":[],"stateMutability":"nonpayable","type":"function"},
+  {"inputs":[{"internalType":"address","name":"baseToken","type":"address"},{"internalType":"address","name":"adapter","type":"address"},{"internalType":"bool","name":"supported","type":"bool"}],"name":"setAdapter","outputs":[],"stateMutability":"nonpayable","type":"function"}
+]

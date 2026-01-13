@@ -1,0 +1,16 @@
+{
+  "chainId": 11155111,
+  "core": "0x543ec2a216ce88cb879819fcd5430afead31942a",
+  "router": "0xe3418022b49e23cf696e053a99a891ee545713b8",
+  "reservations": "0x5e6a87697bcfc2c964d325ac89ec3cd5dd973a0a",
+  "derivedFactory": "0x9b1df7450d78f15edd2c90b2eaa5728d6bacc714",
+  "swapAdapter": "0x6ad1780a9e49b38adf5bd71650226da9dfd961b1",
+  "derivedPools": {
+    "WETH": ""
+  },
+  "tokens": {
+    "stable": "0xccd1718c4073e7ee3db658e0e0f19336bf7ea29a",
+    "rwa": "0x1e2aada0f6db6cfd45baa6d11bdba7ade7addc44",
+    "weth": "0x4c10a586c8baab36b3c02af563561181d8408243"
+  }
+}
