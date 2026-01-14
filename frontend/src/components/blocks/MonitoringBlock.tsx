@@ -23,28 +23,28 @@ const MonitoringBlock: React.FC<MonitoringBlockProps> = ({
   const [fieldOrder, setFieldOrder] = useState(fields);
 
   return (
-    <Card className="relative bg-slate-900 border-slate-700 w-[320px]">
+    <Card className="relative bg-card border-border w-[320px]">
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="w-2 h-2 rounded-full bg-purple-500" />
-            <CardTitle className="text-sm font-medium text-white">{name}</CardTitle>
+            <CardTitle className="text-sm font-medium text-foreground">{name}</CardTitle>
           </div>
         </div>
-        <p className="text-xs text-slate-500">
-          {type === "table" ? "📊 테이블 모니터링" : "🔍 검색 모니터링"}
+        <p className="text-xs text-muted-foreground">
+          {type === "table" ? "테이블 모니터링" : "검색 모니터링"}
         </p>
       </CardHeader>
 
       <CardContent className="space-y-4">
         {/* Connected Stream */}
         <div className="space-y-2">
-          <span className="text-xs text-slate-400">연결된 스트림</span>
+          <span className="text-xs text-muted-foreground">연결된 스트림</span>
           {connectedStream && (
-            <div className="flex items-center justify-between p-2 bg-slate-800 rounded-lg">
+            <div className="flex items-center justify-between p-2 bg-secondary rounded-lg">
               <div className="flex items-center gap-2">
                 <div className="w-1.5 h-1.5 rounded-full bg-green-500" />
-                <span className="text-xs text-slate-300">{connectedStream}</span>
+                <span className="text-xs text-foreground/80">{connectedStream}</span>
               </div>
               <Button
                 variant="ghost"
@@ -61,31 +61,31 @@ const MonitoringBlock: React.FC<MonitoringBlockProps> = ({
         {/* Field Order */}
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <span className="text-xs text-slate-400">필드 순서</span>
-            <Eye className="h-3 w-3 text-slate-500" />
+            <span className="text-xs text-muted-foreground">필드 순서</span>
+            <Eye className="h-3 w-3 text-muted-foreground" />
           </div>
-          <div className="space-y-1 p-3 bg-slate-800/50 rounded-lg">
+          <div className="space-y-1 p-3 bg-secondary/50 rounded-lg">
             {fieldOrder.map((field, index) => (
               <div
                 key={index}
-                className="flex items-center gap-2 p-1.5 bg-slate-800 rounded cursor-move hover:bg-slate-700 transition-colors"
+                className="flex items-center gap-2 p-1.5 bg-secondary rounded cursor-move hover:bg-secondary/80 transition-colors"
                 draggable
               >
-                <GripVertical className="h-3 w-3 text-slate-500" />
-                <span className="text-xs text-slate-300 flex-1">{field}</span>
-                <span className="text-xs text-slate-500 w-4 text-center">{index + 1}</span>
+                <GripVertical className="h-3 w-3 text-muted-foreground" />
+                <span className="text-xs text-foreground/80 flex-1">{field}</span>
+                <span className="text-xs text-muted-foreground w-4 text-center">{index + 1}</span>
               </div>
             ))}
           </div>
-          <p className="text-xs text-slate-500 text-center">드래그하여 순서 변경</p>
+          <p className="text-xs text-muted-foreground text-center">드래그하여 순서 변경</p>
         </div>
       </CardContent>
 
       {/* Connection Points */}
-      <div className="absolute top-1/2 -left-1.5 w-3 h-3 bg-slate-600 rounded-full border-2 border-slate-800 -translate-y-1/2" />
-      <div className="absolute top-1/2 -right-1.5 w-3 h-3 bg-slate-600 rounded-full border-2 border-slate-800 -translate-y-1/2" />
-      <div className="absolute -top-1.5 left-1/2 w-3 h-3 bg-slate-600 rounded-full border-2 border-slate-800 -translate-x-1/2" />
-      <div className="absolute -bottom-1.5 left-1/2 w-3 h-3 bg-slate-600 rounded-full border-2 border-slate-800 -translate-x-1/2" />
+      <div className="absolute top-1/2 -left-1.5 w-3 h-3 bg-secondary rounded-full border-2 border-card -translate-y-1/2" />
+      <div className="absolute top-1/2 -right-1.5 w-3 h-3 bg-secondary rounded-full border-2 border-card -translate-y-1/2" />
+      <div className="absolute -top-1.5 left-1/2 w-3 h-3 bg-secondary rounded-full border-2 border-card -translate-x-1/2" />
+      <div className="absolute -bottom-1.5 left-1/2 w-3 h-3 bg-secondary rounded-full border-2 border-card -translate-x-1/2" />
     </Card>
   );
 };
