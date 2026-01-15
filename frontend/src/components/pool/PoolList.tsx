@@ -22,41 +22,46 @@ interface Pool {
   utilization: number;
 }
 
-const mockPools: Pool[] = [
-  {
-    id: "1",
-    rwaToken: { symbol: "rTSLA", name: "RWA Tesla" },
-    stableToken: { symbol: "USDC" },
-    realReserve: 1250,
-    virtualReservePercent: 50,
-    tvl: 1250000,
-    volume24h: 245000,
-    apy: 12.5,
-    utilization: 75,
-  },
-  {
-    id: "2",
-    rwaToken: { symbol: "rGOLD", name: "RWA Gold" },
-    stableToken: { symbol: "USDC" },
-    realReserve: 500,
-    virtualReservePercent: 100,
-    tvl: 980000,
-    volume24h: 125000,
-    apy: 8.2,
-    utilization: 45,
-  },
-  {
-    id: "3",
-    rwaToken: { symbol: "rREIT", name: "RWA Real Estate" },
-    stableToken: { symbol: "USDT" },
-    realReserve: 2500,
-    virtualReservePercent: 75,
-    tvl: 2100000,
-    volume24h: 320000,
-    apy: 15.8,
-    utilization: 88,
-  },
-];
+// TODO: Fetch real pool data from API
+// Commented out: Mock pool data for demo
+// const mockPools: Pool[] = [
+//   {
+//     id: "1",
+//     rwaToken: { symbol: "rTSLA", name: "RWA Tesla" },
+//     stableToken: { symbol: "USDC" },
+//     realReserve: 1250,
+//     virtualReservePercent: 50,
+//     tvl: 1250000,
+//     volume24h: 245000,
+//     apy: 12.5,
+//     utilization: 75,
+//   },
+//   {
+//     id: "2",
+//     rwaToken: { symbol: "rGOLD", name: "RWA Gold" },
+//     stableToken: { symbol: "USDC" },
+//     realReserve: 500,
+//     virtualReservePercent: 100,
+//     tvl: 980000,
+//     volume24h: 125000,
+//     apy: 8.2,
+//     utilization: 45,
+//   },
+//   {
+//     id: "3",
+//     rwaToken: { symbol: "rREIT", name: "RWA Real Estate" },
+//     stableToken: { symbol: "USDT" },
+//     realReserve: 2500,
+//     virtualReservePercent: 75,
+//     tvl: 2100000,
+//     volume24h: 320000,
+//     apy: 15.8,
+//     utilization: 88,
+//   },
+// ];
+
+// Empty array - will be populated from API
+const mockPools: Pool[] = [];
 
 export function PoolList() {
   return (

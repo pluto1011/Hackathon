@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { TokenSelector, Token } from "@/components/common/TokenSelector";
-import { getPool, getQuote, PoolState, QuoteResult } from "@/lib/api";
+import { getPool, getQuote, getQuoteRwaToStable, PoolState, QuoteResult, RwaToStableQuoteResult } from "@/lib/api";
 import { formatUnits, parseUnits } from "viem";
 
 export function SwapCard() {
@@ -14,8 +14,12 @@ export function SwapCard() {
   const [toAmount, setToAmount] = useState("");
   const [poolState, setPoolState] = useState<PoolState | null>(null);
   const [quote, setQuote] = useState<QuoteResult | null>(null);
+  const [rwaToStableQuote, setRwaToStableQuote] = useState<RwaToStableQuoteResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Check if this is RWA -> Stable direction
+  const isRwaToStable = fromToken?.isRWA && !toToken?.isRWA;
 
   // Fetch pool state on mount and periodically
   useEffect(() => {
@@ -37,6 +41,7 @@ export function SwapCard() {
   const fetchQuote = useCallback(async () => {
     if (!fromToken || !fromAmount || !toToken) {
       setQuote(null);
+      setRwaToStableQuote(null);
       setToAmount("");
       return;
     }
@@ -45,16 +50,27 @@ export function SwapCard() {
       setLoading(true);
       setError(null);
       const amountInWei = parseUnits(fromAmount, fromToken.decimals || 18).toString();
-      const data = await getQuote(fromToken.address, amountInWei);
-      setQuote(data);
 
-      // Set toAmount from quote
-      const rwaOut = formatUnits(BigInt(data.rwaOutQuote), toToken.decimals || 18);
-      setToAmount(rwaOut);
+      // RWA -> Stable direction
+      if (fromToken.isRWA && !toToken.isRWA) {
+        const data = await getQuoteRwaToStable(amountInWei);
+        setRwaToStableQuote(data);
+        setQuote(null);
+        const stableOut = formatUnits(BigInt(data.stableOutQuote), toToken.decimals || 18);
+        setToAmount(stableOut);
+      } else {
+        // Stable/Other -> RWA direction
+        const data = await getQuote(fromToken.address, amountInWei);
+        setQuote(data);
+        setRwaToStableQuote(null);
+        const rwaOut = formatUnits(BigInt(data.rwaOutQuote), toToken.decimals || 18);
+        setToAmount(rwaOut);
+      }
     } catch (err: any) {
       console.error("Failed to fetch quote:", err);
       setError(err.message || "Failed to get quote");
       setQuote(null);
+      setRwaToStableQuote(null);
       setToAmount("");
     } finally {
       setLoading(false);
@@ -167,7 +183,7 @@ export function SwapCard() {
         </div>
 
         {/* Pool Liquidity Info */}
-        {toToken?.isRWA && poolInfo && (
+        {(toToken?.isRWA || fromToken?.isRWA) && poolInfo && (
           <div className="mt-3 p-3 rounded-xl bg-secondary/50">
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs text-muted-foreground">Pool Liquidity (Real/Effective)</span>
@@ -222,20 +238,37 @@ export function SwapCard() {
         </Button>
       </div>
 
-      {fromToken && toToken && fromAmount && quote && !error && (
+      {fromToken && toToken && fromAmount && (quote || rwaToStableQuote) && !error && (
         <div className="mt-2 px-3 space-y-1.5 text-xs">
           <div className="flex items-center justify-between text-muted-foreground">
             <span>You receive</span>
             <span className="text-foreground">
-              {formatUnits(BigInt(quote.rwaOutQuote), 18)} {toToken.symbol}
+              {isRwaToStable && rwaToStableQuote
+                ? formatUnits(BigInt(rwaToStableQuote.stableOutQuote), 18)
+                : quote
+                ? formatUnits(BigInt(quote.rwaOutQuote), 18)
+                : "0"}{" "}
+              {toToken.symbol}
             </span>
           </div>
           <div className="flex items-center justify-between text-muted-foreground">
             <span>Rate</span>
             <span className="text-foreground">
-              1 {fromToken.symbol} ≈ {(Number(quote.rwaOutQuote) / Number(parseUnits(fromAmount, 18))).toFixed(6)} {toToken.symbol}
+              1 {fromToken.symbol} ≈{" "}
+              {isRwaToStable && rwaToStableQuote
+                ? (Number(rwaToStableQuote.stableOutQuote) / Number(parseUnits(fromAmount, 18))).toFixed(6)
+                : quote
+                ? (Number(quote.rwaOutQuote) / Number(parseUnits(fromAmount, 18))).toFixed(6)
+                : "0"}{" "}
+              {toToken.symbol}
             </span>
           </div>
+          {rwaToStableQuote && (
+            <div className="flex items-center justify-between text-muted-foreground">
+              <span>Price Impact</span>
+              <span className="text-foreground">{(Number(rwaToStableQuote.priceImpactBps) / 100).toFixed(2)}%</span>
+            </div>
+          )}
           <div className="flex items-center justify-between text-muted-foreground">
             <span>Fee</span>
             <span className="text-foreground">{poolInfo ? poolInfo.feeBps / 100 : 0}%</span>

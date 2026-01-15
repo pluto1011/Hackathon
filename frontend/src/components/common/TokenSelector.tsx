@@ -20,47 +20,38 @@ export interface Token {
   isRWA?: boolean;
 }
 
+// Real token addresses from shared/addresses.json (Sepolia)
 const defaultTokens: Token[] = [
   {
-    symbol: "USDC",
-    name: "USD Coin",
-    address: "0x...",
-    decimals: 6,
-  },
-  {
-    symbol: "USDT",
-    name: "Tether USD",
-    address: "0x...",
-    decimals: 6,
-  },
-  {
-    symbol: "MNT",
-    name: "Mantle",
-    address: "0x...",
+    symbol: "STABLE",
+    name: "Stable Coin",
+    address: "0xccd1718c4073e7ee3db658e0e0f19336bf7ea29a",
     decimals: 18,
   },
   {
-    symbol: "rTSLA",
-    name: "RWA Tesla",
-    address: "0x...",
+    symbol: "RWA",
+    name: "RWA Token",
+    address: "0x1e2aada0f6db6cfd45baa6d11bdba7ade7addc44",
     decimals: 18,
     isRWA: true,
   },
   {
-    symbol: "rGOLD",
-    name: "RWA Gold",
-    address: "0x...",
+    symbol: "WETH",
+    name: "Wrapped ETH",
+    address: "0x4c10a586c8baab36b3c02af563561181d8408243",
     decimals: 18,
-    isRWA: true,
-  },
-  {
-    symbol: "rREIT",
-    name: "RWA Real Estate",
-    address: "0x...",
-    decimals: 18,
-    isRWA: true,
   },
 ];
+
+// Commented out: Old dummy tokens
+// const dummyTokens: Token[] = [
+//   { symbol: "USDC", name: "USD Coin", address: "0x...", decimals: 6 },
+//   { symbol: "USDT", name: "Tether USD", address: "0x...", decimals: 6 },
+//   { symbol: "MNT", name: "Mantle", address: "0x...", decimals: 18 },
+//   { symbol: "rTSLA", name: "RWA Tesla", address: "0x...", decimals: 18, isRWA: true },
+//   { symbol: "rGOLD", name: "RWA Gold", address: "0x...", decimals: 18, isRWA: true },
+//   { symbol: "rREIT", name: "RWA Real Estate", address: "0x...", decimals: 18, isRWA: true },
+// ];
 
 interface TokenSelectorProps {
   selectedToken?: Token;

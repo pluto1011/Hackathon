@@ -18,6 +18,24 @@ export interface QuoteResult {
 export interface ReservationResult {
   user: string;
   reservedStable: string;
+  isQueued: boolean;
+}
+
+export interface QueueResult {
+  queueLength: string;
+  queueHead: string;
+  pendingCount: number;
+  queueUsers: Array<{
+    position: number;
+    user: string;
+    reservedStable: string;
+  }>;
+}
+
+export interface RwaToStableQuoteResult {
+  stableOutQuote: string;
+  stableOutCap: string;
+  priceImpactBps: string;
 }
 
 export interface ConfigResult {
@@ -114,6 +132,27 @@ export async function setAdapter(
   if (!res.ok) {
     const error = await res.json();
     throw new Error(error.error || "Failed to set adapter");
+  }
+  return res.json();
+}
+
+// Queue functions
+export async function getQueue(): Promise<QueueResult> {
+  const res = await fetch(`${API_URL}/queue`);
+  if (!res.ok) {
+    const error = await res.json();
+    throw new Error(error.error || "Failed to fetch queue");
+  }
+  return res.json();
+}
+
+// RWA -> Stable quote
+export async function getQuoteRwaToStable(amountIn: string): Promise<RwaToStableQuoteResult> {
+  const params = new URLSearchParams({ amountIn });
+  const res = await fetch(`${API_URL}/quote-rwa-to-stable?${params}`);
+  if (!res.ok) {
+    const error = await res.json();
+    throw new Error(error.error || "Failed to fetch RWA to stable quote");
   }
   return res.json();
 }
