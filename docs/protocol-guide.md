@@ -7,6 +7,7 @@
 - 가상 리저브 AMM으로 가격 형성(오라클 없음)
 - 실제 재고를 초과하는 체결은 금지(캡 적용)
 - 초과분은 ReservationManager에 Stable로 예약
+- 중앙화된 마켓메이커 없이 가격 형성 → 시장조작 위험 낮음
 
 ## 핵심 구성 요소
 - `CoreVirtualReservePool`: RWA/Stable 상수곱 가격곡선, 수수료, 실재고 캡 적용
@@ -20,8 +21,8 @@
 - 만기 이후 스왑 불가, 만기 이후부터 생성자 출금 허용
 - 최초 유동성은 풀 생성자가 RWA totalSupply의 2% 이상 + stable > 0로 제공해야 함
 - 최초 유동성 이후에는 누구나 유동성 입출금 가능
-- 가상 리저브는 초기 가격을 유지하도록 RWA/Stable 비율로 자동 계산되며, 기본 변동폭은 ±30% (초기화 전 설정 가능)
-- `setVirtualReserves`, `setMaxPriceMoveBps`는 초기화 전만 가능 (수동 설정 시 자동 계산을 건너뜀)
+- 가상 리저브는 초기 가격을 유지하도록 RWA/Stable 비율로 자동 계산되며, 기본 변동폭은 ±30% (초기화 전 선택 설정 가능)
+- `setVirtualReserves`, `setMaxPriceMoveBps`는 초기화 전만 가능 (선택 설정 시 자동 계산을 건너뜀)
 
 ## 예약 대기열(Quote Queue)
 - 스왑이 캡에 걸리면 초과 Stable이 ReservationManager에 적립되고 대기열에 등록됨
@@ -76,6 +77,8 @@ flowchart LR
 - `LiquidityHubRouter.swapToRwaExactIn(tokenIn, amountIn, minRwaOut, recipient, allowReserve)`
   - 사용처: 실제 스왑 오케스트레이션
   - 동작 요약: 예약 대기열 우선 처리 → 어댑터로 stable 확보 → Core에 스왑 → 초과분 예약/환불
+- `LiquidityHubRouter.swapToStableExactIn(amountIn, minStableOut, recipient, maxUsers)`
+  - 사용처: RWA -> stable 스왑, 필요 시 대기열 처리
 - `LiquidityHubRouter.claimReservation(minRwaOut, recipient)`
   - 사용처: 예약된 Stable로 추후 RWA 체결
   - 제한: 대기열 맨 앞 사용자만 가능
@@ -85,6 +88,8 @@ flowchart LR
   - 사용처: 본인 또는 owner가 예약 취소/환불
 - `LiquidityHubRouter.processQueue(maxUsers)`
   - 사용처: 유동성 공급 이후 대기열 스왑을 우선 처리
+- `LiquidityHubRouter.addLiquidityAndProcess(rwaAmount, stableAmount, maxUsers)`
+  - 사용처: 유동성 추가와 대기열 처리를 같은 트랜잭션에서 수행
 - `LiquidityHubRouter.purgeExpiredQuotes(maxUsers)`
   - 사용처: 만기 이후 대기열 정리 및 환불
 

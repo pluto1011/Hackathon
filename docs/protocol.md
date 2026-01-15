@@ -7,8 +7,9 @@
 - 풀 만기: 배포 시점 + 6시간 (`expiresAt`)
 - 만기 이후: `swap` 불가, 예약은 `purge`로 소멸(환불)
 - 최초 유동성: 풀 생성자만 가능, RWA totalSupply의 2% 이상 + stable > 0
-- 가상 리저브: 초기 가격 비율 유지 + 가격 변동폭이 기본 ±30% (설정 가능)로 제한되도록 자동 계산
+- 가상 리저브: 초기 가격 비율 유지 + 가격 변동폭이 기본 ±30% (선택 설정 가능)로 제한되도록 자동 계산
 - 예약 대기열: FIFO, 유동성 유입 시 대기열 우선 처리
+- 오라클/중앙화 마켓메이커 없이 가격 형성 → 시장조작 위험 낮음
 
 ## 컨트랙트 역할
 - CoreVirtualReservePool: 가격곡선 + 실재고 캡 + 유동성 입출금
@@ -20,7 +21,7 @@
 
 ## 가격/가상 리저브 정책
 - 초기 가격 `P0 = realStable / realRwa`
-- `maxMove = maxPriceMoveBps / BPS` (기본 0.3)
+- `maxMove = maxPriceMoveBps / BPS` (기본 0.3, 미설정 시 기본값 적용)
 - RWA가 모두 소진될 때 가격이 `P0 * (1 + maxMove)`를 넘지 않도록 가상 리저브 계산
 - 실제 적용:
   - `vRwa = ceil(realRwa / (sqrt(1 + maxMove) - 1))`
@@ -41,6 +42,8 @@
 - `DerivedSpotPool.swapExactIn(amountIn, minOut, to, allowReserve)` nonpayable
 - `LiquidityHubRouter.quoteToRwaExactIn(tokenIn, amountIn)` view
 - `LiquidityHubRouter.swapToRwaExactIn(tokenIn, amountIn, minRwaOut, recipient, allowReserve)` nonpayable
+- `LiquidityHubRouter.swapToStableExactIn(amountIn, minStableOut, recipient, maxUsers)` nonpayable  
+  - RWA -> stable 스왑, 필요 시 대기열 처리
 - `LiquidityHubRouter.claimReservation(minRwaOut, recipient)` nonpayable  
   - 대기열 맨 앞 사용자만 가능
 - `LiquidityHubRouter.cancelReservation()` nonpayable
@@ -50,6 +53,8 @@
 ### 2) 예약 대기열 처리 (운영/킵어 권장)
 - `LiquidityHubRouter.processQueue(maxUsers)` nonpayable  
   - 유동성 유입 후 대기열 우선 체결
+- `LiquidityHubRouter.addLiquidityAndProcess(rwaAmount, stableAmount, maxUsers)` nonpayable  
+  - 유동성 추가와 대기열 처리를 같은 트랜잭션에서 수행
 - `LiquidityHubRouter.purgeExpiredQuotes(maxUsers)` nonpayable  
   - 만기 이후 예약 환불
 
@@ -83,7 +88,7 @@
 - `CoreVirtualReservePool.setVirtualReserves(vRwa, vStable)`  
   - 초기화 전만 가능, 수동 설정 시 자동 계산을 건너뜀
 - `CoreVirtualReservePool.setMaxPriceMoveBps(maxPriceMoveBps)`  
-  - 초기화 전만 가능, 기본값은 30%
+  - 초기화 전만 가능, 선택 설정 시 기본값을 덮어씀
 
 ### 6) Backend API (선택, 프론트에서 호출 시)
 - `GET /config` 계약 주소/체인 정보

@@ -28,6 +28,7 @@ contract LiquidityHubRouter is Ownable, ReentrancyGuard {
         uint256 filledRwa,
         uint256 reservedStable
     );
+    event RoutedSwapToStable(address indexed user, uint256 rwaIn, uint256 stableOut, uint256 rwaRefunded);
     event ReservationClaimed(address indexed user, uint256 stableUsed, uint256 rwaReceived, uint256 remainingStable);
     event QueueProcessed(uint256 processedUsers, uint256 processedStable);
     event QuotesPurged(uint256 purgedUsers, uint256 refundedStable);
@@ -130,6 +131,66 @@ contract LiquidityHubRouter is Ownable, ReentrancyGuard {
         }
 
         emit RoutedSwap(msg.sender, tokenIn, amountIn, filledRwa, reservedStable);
+    }
+
+    function swapToStableExactIn(
+        uint256 amountIn,
+        uint256 minStableOut,
+        address recipient,
+        uint256 maxUsers
+    ) external nonReentrant returns (uint256 stableOut, uint256 amountInUsed) {
+        require(block.timestamp < core.expiresAt(), "POOL_EXPIRED");
+        require(recipient != address(0), "ZERO_ADDRESS");
+        require(amountIn > 0, "ZERO_AMOUNT");
+
+        rwa.safeTransferFrom(msg.sender, address(this), amountIn);
+        rwa.safeApprove(address(core), amountIn);
+        (stableOut, amountInUsed) = core.swapExactIn(address(rwa), amountIn, minStableOut, recipient);
+
+        if (amountInUsed < amountIn) {
+            uint256 refund = amountIn - amountInUsed;
+            rwa.safeTransfer(msg.sender, refund);
+            emit RoutedSwapToStable(msg.sender, amountIn, stableOut, refund);
+        } else {
+            emit RoutedSwapToStable(msg.sender, amountIn, stableOut, 0);
+        }
+
+        if (maxUsers > 0) {
+            uint256 processedUsers;
+            uint256 processedStable;
+            (processedUsers, processedStable) = _processQueue(maxUsers);
+            emit QueueProcessed(processedUsers, processedStable);
+        }
+    }
+
+    function addLiquidityAndProcess(uint256 rwaAmount, uint256 stableAmount, uint256 maxUsers)
+        external
+        nonReentrant
+        returns (uint256 processedUsers, uint256 processedStable)
+    {
+        require(rwaAmount > 0 || stableAmount > 0, "ZERO_LIQUIDITY");
+        require(core.liquidityInitialized(), "NOT_INITIALIZED");
+
+        if (rwaAmount > 0) {
+            rwa.safeTransferFrom(msg.sender, address(this), rwaAmount);
+            rwa.safeApprove(address(core), rwaAmount);
+        }
+        if (stableAmount > 0) {
+            stable.safeTransferFrom(msg.sender, address(this), stableAmount);
+            stable.safeApprove(address(core), stableAmount);
+        }
+
+        core.addLiquidity(rwaAmount, stableAmount);
+
+        if (maxUsers > 0) {
+            if (block.timestamp >= core.expiresAt()) {
+                (processedUsers, processedStable) = _purgeExpiredQuotes(maxUsers);
+                emit QuotesPurged(processedUsers, processedStable);
+            } else {
+                (processedUsers, processedStable) = _processQueue(maxUsers);
+                emit QueueProcessed(processedUsers, processedStable);
+            }
+        }
     }
 
     function claimReservation(uint256 minRwaOut, address recipient) external nonReentrant returns (uint256 filledRwa) {

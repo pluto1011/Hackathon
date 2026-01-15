@@ -26,7 +26,8 @@
 - 최초 유동성: 생성자만 가능, RWA totalSupply의 2% 이상 + stable > 0 필요
 - 생성자 출금: 만기 이전 불가
 - 실재고 캡: 실제 재고 이상의 체결 금지
-- 가격 변동폭: 기본 ±30%, 초기화 전 `setMaxPriceMoveBps`로 조정 가능
+- 가격 변동폭: 기본 ±30%, 초기화 전 `setMaxPriceMoveBps`로 선택적으로 조정 가능
+- 오라클/중앙화 마켓메이커 없이 가격 형성 → 시장조작 위험 낮음
 - allowReserve=false일 때는 초과분이 환불될 수 있음
 
 ## 참여 가이드
@@ -34,10 +35,11 @@
 ### 기관/발행자 (풀 생성자)
 1. 준비: RWA ERC20, stable ERC20, 초기 수수료/어댑터 정책 결정
 2. 배포: CoreVirtualReservePool, ReservationManager, LiquidityHubRouter 배포 후 router 연결
-3. 초기 유동성: `addLiquidity`로 RWA 2% 이상 + stable 예치
-4. 유통 채널: baseToken 사용 시 `setAdapter` 등록 및 DerivedSpotPool 생성
-5. 운영: 유동성 유입 후 `processQueue`, 만기 후 `purgeExpiredQuotes`
-6. 통합: `shared/addresses.json` 갱신 후 프론트/백엔드 연결
+3. 가격 변동폭(선택): `setMaxPriceMoveBps`로 설정하거나 기본값 사용
+4. 초기 유동성: `addLiquidity`로 RWA 2% 이상 + stable 예치
+5. 유통 채널: baseToken 사용 시 `setAdapter` 등록 및 DerivedSpotPool 생성
+6. 운영: 유동성 유입 후 `processQueue`, 만기 후 `purgeExpiredQuotes`
+7. 통합: `shared/addresses.json` 갱신 후 프론트/백엔드 연결
 
 참고: 데모 배포 흐름은 `contracts/script/Deploy.s.sol`에 정리되어 있습니다.
 
@@ -45,12 +47,14 @@
 1. 풀 초기화 이후 누구나 유동성 입출금 가능
 2. 출금 시 creator는 만기 전 락에 유의
 3. 유동성 추가 후 대기열 처리(`processQueue`) 권장
+4. 한 트랜잭션에서 처리하려면 `addLiquidityAndProcess` 사용
 
 ### 개인 트레이더
 1. `quote`로 예상값과 캡 여부 확인
 2. `swap` 시 allowReserve 선택
 3. 예약 발생 시 `claimReservation` 또는 `cancelReservation` 사용
 4. 지원 baseToken 외에는 stable로 직접 스왑
+5. RWA -> stable 스왑은 `swapToStableExactIn` 사용 가능
 
 ### 운영/킵어
 - 대기열 처리: `processQueue(maxUsers)`
