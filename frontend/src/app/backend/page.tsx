@@ -12,7 +12,6 @@ import {
   Activity,
   Database,
   Percent,
-  Users,
   Link2,
   RefreshCw,
   CheckCircle2,
@@ -36,7 +35,6 @@ import {
   getHealth,
   setVirtualReserves,
   setFee,
-  setSupplier,
   setAdapter,
   PoolState,
   ConfigResult,
@@ -54,7 +52,6 @@ export default function BackendPage() {
   // Admin form states
   const [vReservesForm, setVReservesForm] = useState({ vRwa: "", vStable: "" });
   const [feeForm, setFeeForm] = useState({ feeBps: "" });
-  const [supplierForm, setSupplierForm] = useState({ supplier: "", enabled: true });
   const [adapterForm, setAdapterForm] = useState({ baseToken: "", adapter: "", supported: true });
 
   // Action states
@@ -123,20 +120,6 @@ export default function BackendPage() {
     setActionResult(null);
     try {
       const result = await setFee(Number(feeForm.feeBps));
-      setActionResult({ type: "success", message: `Tx: ${result.txHash.slice(0, 10)}...` });
-      fetchData();
-    } catch (err: any) {
-      setActionResult({ type: "error", message: err.message });
-    } finally {
-      setActionLoading(null);
-    }
-  };
-
-  const handleSetSupplier = async () => {
-    setActionLoading("supplier");
-    setActionResult(null);
-    try {
-      const result = await setSupplier(supplierForm.supplier, supplierForm.enabled);
       setActionResult({ type: "success", message: `Tx: ${result.txHash.slice(0, 10)}...` });
       fetchData();
     } catch (err: any) {
@@ -453,56 +436,6 @@ export default function BackendPage() {
                         <Loader2 className="h-4 w-4 animate-spin mr-2" />
                       ) : null}
                       Update Fee
-                    </Button>
-                  </CardContent>
-                </Card>
-
-                {/* Set Supplier */}
-                <Card className="bg-card border-border">
-                  <CardHeader>
-                    <CardTitle className="text-base flex items-center gap-2">
-                      <Users className="h-4 w-4 text-purple-500" />
-                      Manage Supplier
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="supplier">Supplier Address</Label>
-                      <Input
-                        id="supplier"
-                        placeholder="0x..."
-                        value={supplierForm.supplier}
-                        onChange={(e) => setSupplierForm({ ...supplierForm, supplier: e.target.value })}
-                      />
-                    </div>
-                    <div className="flex items-center gap-4">
-                      <Label>Status:</Label>
-                      <div className="flex gap-2">
-                        <Button
-                          variant={supplierForm.enabled ? "default" : "outline"}
-                          size="sm"
-                          onClick={() => setSupplierForm({ ...supplierForm, enabled: true })}
-                        >
-                          Enable
-                        </Button>
-                        <Button
-                          variant={!supplierForm.enabled ? "default" : "outline"}
-                          size="sm"
-                          onClick={() => setSupplierForm({ ...supplierForm, enabled: false })}
-                        >
-                          Disable
-                        </Button>
-                      </div>
-                    </div>
-                    <Button
-                      className="w-full"
-                      onClick={handleSetSupplier}
-                      disabled={actionLoading === "supplier"}
-                    >
-                      {actionLoading === "supplier" ? (
-                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                      ) : null}
-                      Update Supplier
                     </Button>
                   </CardContent>
                 </Card>

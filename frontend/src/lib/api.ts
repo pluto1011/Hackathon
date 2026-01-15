@@ -101,19 +101,6 @@ export async function setFee(feeBps: number): Promise<TxResult> {
   return res.json();
 }
 
-export async function setSupplier(supplier: string, enabled: boolean): Promise<TxResult> {
-  const res = await fetch(`${API_URL}/admin/supplier`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ supplier, enabled }),
-  });
-  if (!res.ok) {
-    const error = await res.json();
-    throw new Error(error.error || "Failed to set supplier");
-  }
-  return res.json();
-}
-
 export async function setAdapter(
   baseToken: string,
   adapter: string,
