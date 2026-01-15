@@ -32,6 +32,9 @@ flowchart LR
 ```
 
 ## 문서
+- `docs/README.md` (GitBook 홈)
+- `docs/SUMMARY.md` (GitBook 네비게이션)
+- `docs/user-guide.md` (프로젝트 소개 + 사용자 인터랙션)
 - `docs/protocol-guide.md` (프로토콜 설명 + 아키텍처 + 사용자/LP 함수 정리)
 - `docs/protocol.md` (프로토콜 규칙 + 프론트 연동 함수 목록)
 
