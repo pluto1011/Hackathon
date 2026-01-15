@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useAccount } from "wagmi";
+import { useAccount, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
 import { Header } from "@/components/layout/Header";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -12,8 +12,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { getReservation, ReservationResult } from "@/lib/api";
+import { getReservation, getQueue, ReservationResult, QueueResult } from "@/lib/api";
 import { formatUnits } from "viem";
+import { CONFIG } from "@/lib/config";
+import routerAbi from "../../../../shared/abi/LiquidityHubRouter.json";
 
 interface Reservation {
   id: string;
@@ -27,47 +29,75 @@ interface Reservation {
   status: "pending" | "claimable" | "cancelled";
   queuePosition?: number;
   estimatedFill?: string;
+  isHead?: boolean;
 }
 
 export default function ReservationsPage() {
   const { address, isConnected } = useAccount();
   const [activeTab, setActiveTab] = useState("all");
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
+  const [claimDialogOpen, setClaimDialogOpen] = useState(false);
   const [selectedReservation, setSelectedReservation] = useState<Reservation | null>(null);
   const [reservationData, setReservationData] = useState<ReservationResult | null>(null);
+  const [queueData, setQueueData] = useState<QueueResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [reservations, setReservations] = useState<Reservation[]>([]);
 
-  // Fetch reservation data from API
+  // Contract write hooks
+  const { writeContract: cancelReservation, data: cancelHash, isPending: isCancelling } = useWriteContract();
+  const { writeContract: claimReservation, data: claimHash, isPending: isClaiming } = useWriteContract();
+
+  const { isLoading: isCancelConfirming, isSuccess: isCancelSuccess } = useWaitForTransactionReceipt({
+    hash: cancelHash,
+  });
+
+  const { isLoading: isClaimConfirming, isSuccess: isClaimSuccess } = useWaitForTransactionReceipt({
+    hash: claimHash,
+  });
+
+  // Fetch reservation and queue data from API
   useEffect(() => {
-    const fetchReservation = async () => {
+    const fetchData = async () => {
       if (!address) {
         setReservationData(null);
+        setQueueData(null);
         setReservations([]);
         return;
       }
 
       try {
         setLoading(true);
-        const data = await getReservation(address);
-        setReservationData(data);
+        const [resData, qData] = await Promise.all([
+          getReservation(address),
+          getQueue(),
+        ]);
+        setReservationData(resData);
+        setQueueData(qData);
+
+        // Find user's position in queue
+        const userQueueInfo = qData.queueUsers.find(
+          (u) => u.user.toLowerCase() === address.toLowerCase()
+        );
+        const isHead = qData.queueUsers.length > 0 &&
+          qData.queueUsers[0].user.toLowerCase() === address.toLowerCase();
 
         // Convert API data to reservation format
-        const reservedAmount = Number(formatUnits(BigInt(data.reservedStable), 18));
+        const reservedAmount = Number(formatUnits(BigInt(resData.reservedStable), 18));
         if (reservedAmount > 0) {
           setReservations([
             {
               id: "1",
               token: "RWA",
               tokenName: "RWA Token",
-              amount: 0, // Amount will be calculated when claiming
+              amount: 0,
               stableDeposited: reservedAmount,
               stableSymbol: "Stable",
               priceAtReservation: 0,
               timestamp: new Date().toISOString(),
-              status: "pending",
-              queuePosition: 1,
-              estimatedFill: "When liquidity available",
+              status: isHead ? "claimable" : "pending",
+              queuePosition: userQueueInfo?.position || undefined,
+              estimatedFill: isHead ? "Ready to claim" : "When liquidity available",
+              isHead,
             },
           ]);
         } else {
@@ -81,10 +111,23 @@ export default function ReservationsPage() {
       }
     };
 
-    fetchReservation();
-    const interval = setInterval(fetchReservation, 15000); // Refresh every 15s
+    fetchData();
+    const interval = setInterval(fetchData, 15000);
     return () => clearInterval(interval);
-  }, [address]);
+  }, [address, isCancelSuccess, isClaimSuccess]);
+
+  // Close dialogs on success
+  useEffect(() => {
+    if (isCancelSuccess) {
+      setCancelDialogOpen(false);
+    }
+  }, [isCancelSuccess]);
+
+  useEffect(() => {
+    if (isClaimSuccess) {
+      setClaimDialogOpen(false);
+    }
+  }, [isClaimSuccess]);
 
   const filteredReservations = reservations.filter((r) => {
     if (activeTab === "all") return true;
@@ -98,9 +141,9 @@ export default function ReservationsPage() {
   const getStatusText = (status: Reservation["status"]) => {
     switch (status) {
       case "pending":
-        return <span className="text-xs text-muted-foreground">Pending</span>;
+        return <span className="text-xs text-yellow-500">Pending</span>;
       case "claimable":
-        return <span className="text-xs text-foreground">Claimable</span>;
+        return <span className="text-xs text-green-500">Claimable</span>;
       case "cancelled":
         return <span className="text-xs text-muted-foreground/60">Cancelled</span>;
     }
@@ -109,6 +152,33 @@ export default function ReservationsPage() {
   const handleCancelClick = (reservation: Reservation) => {
     setSelectedReservation(reservation);
     setCancelDialogOpen(true);
+  };
+
+  const handleClaimClick = (reservation: Reservation) => {
+    setSelectedReservation(reservation);
+    setClaimDialogOpen(true);
+  };
+
+  const handleCancelConfirm = () => {
+    if (!CONFIG.router) return;
+
+    cancelReservation({
+      address: CONFIG.router as `0x${string}`,
+      abi: routerAbi,
+      functionName: "cancelReservation",
+      args: [],
+    });
+  };
+
+  const handleClaimConfirm = () => {
+    if (!CONFIG.router || !address) return;
+
+    claimReservation({
+      address: CONFIG.router as `0x${string}`,
+      abi: routerAbi,
+      functionName: "claimReservation",
+      args: [BigInt(0), address], // minRwaOut = 0, recipient = user
+    });
   };
 
   return (
@@ -145,16 +215,27 @@ export default function ReservationsPage() {
                   <div className="text-muted-foreground mb-0.5">Claimable</div>
                   <div className="text-lg font-medium">{loading ? "..." : claimableCount}</div>
                 </div>
+                <div>
+                  <div className="text-muted-foreground mb-0.5">Queue Total</div>
+                  <div className="text-lg font-medium">{loading ? "..." : queueData?.pendingCount || 0}</div>
+                </div>
               </div>
 
-              {reservationData && (
+              {reservationData && Number(reservationData.reservedStable) > 0 && (
                 <div className="mb-6 p-4 bg-card rounded-xl">
                   <div className="text-sm text-muted-foreground mb-1">Your Reserved Stable Balance</div>
                   <div className="text-2xl font-medium">
                     {formatUnits(BigInt(reservationData.reservedStable), 18)} Stable
                   </div>
+                  <div className="flex items-center gap-2 mt-2">
+                    <span className={`text-xs px-2 py-0.5 rounded ${reservationData.isQueued ? "bg-green-500/20 text-green-500" : "bg-yellow-500/20 text-yellow-500"}`}>
+                      {reservationData.isQueued ? "In Queue" : "Not in Queue"}
+                    </span>
+                  </div>
                   <div className="text-xs text-muted-foreground mt-2">
-                    This will be converted to RWA when liquidity becomes available.
+                    {reservations[0]?.isHead
+                      ? "You are at the front of the queue. You can claim now!"
+                      : "This will be converted to RWA when liquidity becomes available."}
                   </div>
                 </div>
               )}
@@ -206,8 +287,13 @@ export default function ReservationsPage() {
                               </div>
 
                               {reservation.status === "claimable" && (
-                                <Button size="sm" className="h-8 px-4 bg-foreground text-background hover:bg-foreground/90">
-                                  Claim
+                                <Button
+                                  size="sm"
+                                  className="h-8 px-4 bg-foreground text-background hover:bg-foreground/90"
+                                  onClick={() => handleClaimClick(reservation)}
+                                  disabled={isClaiming || isClaimConfirming}
+                                >
+                                  {isClaiming || isClaimConfirming ? "Claiming..." : "Claim"}
                                 </Button>
                               )}
                               {reservation.status === "pending" && (
@@ -216,8 +302,9 @@ export default function ReservationsPage() {
                                   size="sm"
                                   className="h-8 px-4 text-muted-foreground hover:text-foreground"
                                   onClick={() => handleCancelClick(reservation)}
+                                  disabled={isCancelling || isCancelConfirming}
                                 >
-                                  Cancel
+                                  {isCancelling || isCancelConfirming ? "Cancelling..." : "Cancel"}
                                 </Button>
                               )}
                               {reservation.status === "cancelled" && (
@@ -226,10 +313,10 @@ export default function ReservationsPage() {
                             </div>
                           </div>
 
-                          {reservation.status === "pending" && reservation.estimatedFill && (
+                          {(reservation.status === "pending" || reservation.status === "claimable") && reservation.estimatedFill && (
                             <div className="mt-3 pt-3 border-t border-border flex items-center gap-2 text-xs text-muted-foreground">
-                              <span>Est. fill: {reservation.estimatedFill}</span>
-                              {reservation.queuePosition && <span>Queue #{reservation.queuePosition}</span>}
+                              <span>{reservation.estimatedFill}</span>
+                              {reservation.queuePosition && <span>| Queue #{reservation.queuePosition}</span>}
                             </div>
                           )}
                         </div>
@@ -243,6 +330,7 @@ export default function ReservationsPage() {
         </div>
       </main>
 
+      {/* Cancel Dialog */}
       <Dialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
@@ -270,17 +358,65 @@ export default function ReservationsPage() {
                   variant="ghost"
                   className="flex-1"
                   onClick={() => setCancelDialogOpen(false)}
+                  disabled={isCancelling || isCancelConfirming}
                 >
                   Keep
                 </Button>
                 <Button
                   className="flex-1 bg-foreground text-background hover:bg-foreground/90"
-                  onClick={() => {
-                    // TODO: Call contract to cancel reservation
-                    setCancelDialogOpen(false);
-                  }}
+                  onClick={handleCancelConfirm}
+                  disabled={isCancelling || isCancelConfirming}
                 >
-                  Cancel & Refund
+                  {isCancelling || isCancelConfirming ? "Processing..." : "Cancel & Refund"}
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Claim Dialog */}
+      <Dialog open={claimDialogOpen} onOpenChange={setClaimDialogOpen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Claim Reservation</DialogTitle>
+            <DialogDescription>
+              Convert your reserved stable to RWA tokens.
+            </DialogDescription>
+          </DialogHeader>
+
+          {selectedReservation && (
+            <div className="space-y-4">
+              <div className="bg-secondary rounded-lg p-3 space-y-2 text-sm">
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Reserved</span>
+                  <span>{selectedReservation.stableDeposited.toLocaleString(undefined, { maximumFractionDigits: 4 })} {selectedReservation.stableSymbol}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Receive</span>
+                  <span>RWA (based on current price)</span>
+                </div>
+              </div>
+
+              <p className="text-xs text-muted-foreground">
+                If pool liquidity is insufficient, any remaining stable will stay reserved.
+              </p>
+
+              <div className="flex gap-2">
+                <Button
+                  variant="ghost"
+                  className="flex-1"
+                  onClick={() => setClaimDialogOpen(false)}
+                  disabled={isClaiming || isClaimConfirming}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  className="flex-1 bg-foreground text-background hover:bg-foreground/90"
+                  onClick={handleClaimConfirm}
+                  disabled={isClaiming || isClaimConfirming}
+                >
+                  {isClaiming || isClaimConfirming ? "Processing..." : "Claim RWA"}
                 </Button>
               </div>
             </div>

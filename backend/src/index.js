@@ -133,7 +133,58 @@ app.get("/reservation/:user", async (req, res) => {
   try {
     const user = req.params.user;
     const amount = await reservations.reservedStable(user);
-    res.json({ user, reservedStable: amount.toString() });
+    const isQueued = await reservations.queued(user);
+    res.json({ user, reservedStable: amount.toString(), isQueued });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get("/queue", async (_req, res) => {
+  try {
+    const [queueLength, queueHead] = await Promise.all([
+      reservations.queueLength(),
+      reservations.queueHead(),
+    ]);
+    const pendingCount = Number(queueLength) - Number(queueHead);
+
+    // Get first few users in queue
+    const queueUsers = [];
+    const maxDisplay = Math.min(pendingCount, 10);
+    for (let i = 0; i < maxDisplay; i++) {
+      const idx = Number(queueHead) + i;
+      const user = await reservations.queue(idx);
+      if (user !== "0x0000000000000000000000000000000000000000") {
+        const amount = await reservations.reservedStable(user);
+        queueUsers.push({ position: i + 1, user, reservedStable: amount.toString() });
+      }
+    }
+
+    res.json({
+      queueLength: queueLength.toString(),
+      queueHead: queueHead.toString(),
+      pendingCount,
+      queueUsers,
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get("/quote-rwa-to-stable", async (req, res) => {
+  try {
+    const amountIn = req.query.amountIn;
+    if (!amountIn) {
+      return res.status(400).json({ error: "amountIn is required" });
+    }
+
+    const rwaAddress = await core.rwa();
+    const quote = await core.quoteExactIn(rwaAddress, amountIn);
+    res.json({
+      stableOutQuote: quote[0].toString(),
+      stableOutCap: quote[1].toString(),
+      priceImpactBps: quote[2].toString(),
+    });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

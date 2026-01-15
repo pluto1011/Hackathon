@@ -7,7 +7,7 @@ import { ConnectButton } from "@rainbow-me/rainbowkit";
 const navItems = [
   { name: "Swap", href: "/" },
   { name: "Pool", href: "/pool" },
-  { name: "Analytics", href: "/analytics" },
+  // { name: "Analytics", href: "/analytics" }, // TODO: Implement analytics page
   { name: "Reservations", href: "/reservations" },
   { name: "Backend", href: "/backend" },
   { name: "About", href: "/about" },

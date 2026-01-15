@@ -1,10 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
+import { Label } from "@/components/ui/label";
+import { getPool, getQueue, PoolState, QueueResult } from "@/lib/api";
+import { formatUnits } from "viem";
 
 interface AddLiquidityFormProps {
   poolId?: string;
@@ -14,23 +17,49 @@ interface AddLiquidityFormProps {
 
 export function AddLiquidityForm({
   poolId,
-  rwaSymbol = "rTSLA",
+  rwaSymbol = "RWA",
   stableSymbol = "USDC",
 }: AddLiquidityFormProps) {
   const [rwaAmount, setRwaAmount] = useState("");
   const [stableAmount, setStableAmount] = useState("");
+  const [processQueue, setProcessQueue] = useState(true);
+  const [maxUsers, setMaxUsers] = useState("10");
+  const [poolState, setPoolState] = useState<PoolState | null>(null);
+  const [queueInfo, setQueueInfo] = useState<QueueResult | null>(null);
 
-  const poolInfo = {
-    currentPrice: 245.32,
-    yourLiquidity: 0,
-    yourShare: 0,
-    totalRealReserve: 1250,
-    totalVirtualReserve: 625,
-  };
+  // Fetch pool and queue state
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [pool, queue] = await Promise.all([getPool(), getQueue()]);
+        setPoolState(pool);
+        setQueueInfo(queue);
+      } catch (err) {
+        console.error("Failed to fetch pool/queue:", err);
+      }
+    };
+
+    fetchData();
+    const interval = setInterval(fetchData, 10000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const poolInfo = poolState
+    ? {
+        currentPrice:
+          Number(poolState.effective.stable) > 0 && Number(poolState.effective.rwa) > 0
+            ? Number(formatUnits(BigInt(poolState.effective.stable), 18)) /
+              Number(formatUnits(BigInt(poolState.effective.rwa), 18))
+            : 0,
+        totalRealReserve: Number(formatUnits(BigInt(poolState.real.rwa), 18)),
+        totalVirtualReserve: Number(formatUnits(BigInt(poolState.virtual.rwa), 18)),
+        totalRealStable: Number(formatUnits(BigInt(poolState.real.stable), 18)),
+      }
+    : null;
 
   const handleRwaChange = (value: string) => {
     setRwaAmount(value);
-    if (value) {
+    if (value && poolInfo && poolInfo.currentPrice > 0) {
       const stable = parseFloat(value) * poolInfo.currentPrice;
       setStableAmount(stable.toFixed(2));
     } else {
@@ -40,12 +69,20 @@ export function AddLiquidityForm({
 
   const handleStableChange = (value: string) => {
     setStableAmount(value);
-    if (value) {
+    if (value && poolInfo && poolInfo.currentPrice > 0) {
       const rwa = parseFloat(value) / poolInfo.currentPrice;
       setRwaAmount(rwa.toFixed(6));
     } else {
       setRwaAmount("");
     }
+  };
+
+  const getButtonText = () => {
+    if (!rwaAmount && !stableAmount) return "Enter amounts";
+    if (processQueue && queueInfo && queueInfo.pendingCount > 0) {
+      return `Add Liquidity & Process Queue (${queueInfo.pendingCount} pending)`;
+    }
+    return "Add Liquidity";
   };
 
   return (
@@ -68,7 +105,7 @@ export function AddLiquidityForm({
               <div>
                 <div className="font-semibold text-lg">{rwaSymbol}/{stableSymbol}</div>
                 <div className="text-sm text-muted-foreground">
-                  1 {rwaSymbol} = ${poolInfo.currentPrice.toFixed(2)}
+                  1 {rwaSymbol} = ${poolInfo?.currentPrice.toFixed(2) || "0.00"}
                 </div>
               </div>
             </div>
@@ -129,26 +166,63 @@ export function AddLiquidityForm({
 
         <Separator />
 
+        {/* Queue Processing Option */}
+        {queueInfo && queueInfo.pendingCount > 0 && (
+          <div className="p-3 rounded-xl bg-blue-500/10 border border-blue-500/20">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="processQueue"
+                  checked={processQueue}
+                  onChange={(e) => setProcessQueue(e.target.checked)}
+                  className="rounded"
+                />
+                <Label htmlFor="processQueue" className="text-sm cursor-pointer">
+                  Process reservation queue
+                </Label>
+              </div>
+              <span className="text-xs text-blue-500">{queueInfo.pendingCount} pending</span>
+            </div>
+            {processQueue && (
+              <div className="flex items-center gap-2 mt-2">
+                <Label className="text-xs text-muted-foreground">Max users to process:</Label>
+                <Input
+                  type="number"
+                  value={maxUsers}
+                  onChange={(e) => setMaxUsers(e.target.value)}
+                  className="w-20 h-7 text-xs"
+                  min="1"
+                  max="100"
+                />
+              </div>
+            )}
+            <p className="text-xs text-muted-foreground mt-2">
+              Using addLiquidityAndProcess() to add liquidity and process queue in one transaction.
+            </p>
+          </div>
+        )}
+
         <div className="space-y-3 text-sm">
           <div className="flex items-center justify-between">
-            <span className="text-muted-foreground">Your Pool Share</span>
-            <span className="font-medium">{poolInfo.yourShare}%</span>
-          </div>
-          <div className="flex items-center justify-between">
             <span className="text-muted-foreground">Pool Real Reserve</span>
-            <span className="font-medium">{poolInfo.totalRealReserve.toLocaleString()} {rwaSymbol}</span>
+            <span className="font-medium">{poolInfo?.totalRealReserve.toLocaleString(undefined, { maximumFractionDigits: 2 }) || "0"} {rwaSymbol}</span>
           </div>
           <div className="flex items-center justify-between">
             <span className="text-muted-foreground">Pool Virtual Reserve</span>
-            <span className="font-medium text-primary">{poolInfo.totalVirtualReserve.toLocaleString()} {rwaSymbol}</span>
+            <span className="font-medium text-primary">{poolInfo?.totalVirtualReserve.toLocaleString(undefined, { maximumFractionDigits: 2 }) || "0"} {rwaSymbol}</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-muted-foreground">Pool Stable Reserve</span>
+            <span className="font-medium">{poolInfo?.totalRealStable.toLocaleString(undefined, { maximumFractionDigits: 2 }) || "0"} {stableSymbol}</span>
           </div>
         </div>
 
         <Button
           className="w-full h-14 text-lg font-semibold bg-foreground text-background hover:bg-foreground/90 rounded-2xl"
-          disabled={!rwaAmount || !stableAmount}
+          disabled={!rwaAmount && !stableAmount}
         >
-          {!rwaAmount || !stableAmount ? "Enter amounts" : "Add Liquidity"}
+          {getButtonText()}
         </Button>
       </CardContent>
     </Card>
