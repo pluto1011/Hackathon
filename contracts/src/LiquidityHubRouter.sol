@@ -29,6 +29,8 @@ contract LiquidityHubRouter is Ownable, ReentrancyGuard {
         uint256 reservedStable
     );
     event ReservationClaimed(address indexed user, uint256 stableUsed, uint256 rwaReceived, uint256 remainingStable);
+    event QueueProcessed(uint256 processedUsers, uint256 processedStable);
+    event QuotesPurged(uint256 purgedUsers, uint256 refundedStable);
 
     constructor(CoreVirtualReservePool _core, ReservationManager _reservations) {
         core = _core;
@@ -73,8 +75,11 @@ contract LiquidityHubRouter is Ownable, ReentrancyGuard {
         address recipient,
         bool allowReserve
     ) external nonReentrant returns (uint256 filledRwa, uint256 reservedStable) {
+        require(block.timestamp < core.expiresAt(), "POOL_EXPIRED");
         require(recipient != address(0), "ZERO_ADDRESS");
         require(amountIn > 0, "ZERO_AMOUNT");
+
+        _processQueue(type(uint256).max);
 
         uint256 stableQuote = amountIn;
         address adapter = address(0);
@@ -128,10 +133,14 @@ contract LiquidityHubRouter is Ownable, ReentrancyGuard {
     }
 
     function claimReservation(uint256 minRwaOut, address recipient) external nonReentrant returns (uint256 filledRwa) {
+        require(block.timestamp < core.expiresAt(), "POOL_EXPIRED");
         require(recipient != address(0), "ZERO_ADDRESS");
 
         uint256 reserved = reservations.reservedStable(msg.sender);
         require(reserved > 0, "NO_RESERVATION");
+
+        (address headUser,) = reservations.nextReservation();
+        require(headUser == msg.sender, "NOT_HEAD");
 
         reservations.releaseStable(msg.sender, reserved, address(this));
         stable.safeApprove(address(core), reserved);
@@ -147,7 +156,96 @@ contract LiquidityHubRouter is Ownable, ReentrancyGuard {
         emit ReservationClaimed(msg.sender, amountInUsed, filledRwa, remaining);
     }
 
+    function processQueue(uint256 maxUsers)
+        external
+        nonReentrant
+        returns (uint256 processedUsers, uint256 processedStable)
+    {
+        if (block.timestamp >= core.expiresAt()) {
+            (processedUsers, processedStable) = _purgeExpiredQuotes(maxUsers);
+            emit QuotesPurged(processedUsers, processedStable);
+            return (processedUsers, processedStable);
+        }
+
+        (processedUsers, processedStable) = _processQueue(maxUsers);
+        emit QueueProcessed(processedUsers, processedStable);
+    }
+
+    function purgeExpiredQuotes(uint256 maxUsers)
+        external
+        nonReentrant
+        returns (uint256 purgedUsers, uint256 refundedStable)
+    {
+        require(block.timestamp >= core.expiresAt(), "NOT_EXPIRED");
+        (purgedUsers, refundedStable) = _purgeExpiredQuotes(maxUsers);
+        emit QuotesPurged(purgedUsers, refundedStable);
+    }
+
     function cancelReservation() external nonReentrant {
         reservations.cancel();
+    }
+
+    function cancelReservationFor(address user) external nonReentrant {
+        require(user != address(0), "ZERO_ADDRESS");
+        require(msg.sender == user || msg.sender == owner, "NOT_AUTH");
+        reservations.cancelFor(user);
+    }
+
+    function _processQueue(uint256 maxUsers)
+        internal
+        returns (uint256 processedUsers, uint256 processedStable)
+    {
+        if (maxUsers == 0) {
+            return (0, 0);
+        }
+
+        for (uint256 i = 0; i < maxUsers; i++) {
+            (address user, uint256 amount) = reservations.nextReservation();
+            if (user == address(0) || amount == 0) {
+                break;
+            }
+
+            (, uint256 maxFillOut,) = core.quoteExactIn(address(stable), amount);
+            if (maxFillOut == 0) {
+                break;
+            }
+
+            reservations.releaseStable(user, amount, address(this));
+            stable.safeApprove(address(core), amount);
+            (uint256 filledRwa, uint256 amountInUsed) = core.swapExactIn(address(stable), amount, 0, user);
+
+            processedUsers += 1;
+            processedStable += amountInUsed;
+
+            if (amountInUsed < amount) {
+                uint256 remaining = amount - amountInUsed;
+                stable.safeApprove(address(reservations), remaining);
+                reservations.createReservation(user, remaining);
+                emit ReservationClaimed(user, amountInUsed, filledRwa, remaining);
+                break;
+            }
+
+            emit ReservationClaimed(user, amountInUsed, filledRwa, 0);
+        }
+    }
+
+    function _purgeExpiredQuotes(uint256 maxUsers)
+        internal
+        returns (uint256 purgedUsers, uint256 refundedStable)
+    {
+        if (maxUsers == 0) {
+            return (0, 0);
+        }
+
+        for (uint256 i = 0; i < maxUsers; i++) {
+            (address user, uint256 amount) = reservations.nextReservation();
+            if (user == address(0) || amount == 0) {
+                break;
+            }
+
+            reservations.cancelFor(user);
+            purgedUsers += 1;
+            refundedStable += amount;
+        }
     }
 }

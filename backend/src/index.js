@@ -171,22 +171,6 @@ app.post("/admin/fee", async (req, res) => {
   }
 });
 
-app.post("/admin/supplier", async (req, res) => {
-  if (!adminCore) {
-    return res.status(401).json({ error: "ADMIN_PK not set" });
-  }
-  try {
-    const { supplier, enabled } = req.body;
-    if (!supplier || enabled === undefined) {
-      return res.status(400).json({ error: "supplier and enabled are required" });
-    }
-    const tx = await adminCore.setSupplier(supplier, enabled);
-    res.json({ txHash: tx.hash });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
 app.post("/admin/adapter", async (req, res) => {
   if (!adminRouter) {
     return res.status(401).json({ error: "ADMIN_PK not set" });

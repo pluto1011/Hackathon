@@ -15,10 +15,14 @@ contract ReservationManager is Ownable, ReentrancyGuard {
     mapping(address => uint256) public reservedStable;
     mapping(address => uint64) public createdAt;
     uint64 public ttl;
+    address[] public queue;
+    uint256 public queueHead;
+    mapping(address => bool) public queued;
 
     event RouterUpdated(address indexed router);
     event TtlUpdated(uint64 ttl);
     event ReservationCreated(address indexed user, uint256 stableAmount);
+    event ReservationQueued(address indexed user);
     event ReservationCancelled(address indexed user, uint256 refundedStable);
     event ReservationReleased(address indexed user, uint256 stableAmount, address indexed to);
 
@@ -44,9 +48,19 @@ contract ReservationManager is Ownable, ReentrancyGuard {
         emit TtlUpdated(_ttl);
     }
 
+    function queueLength() external view returns (uint256) {
+        return queue.length;
+    }
+
     function createReservation(address user, uint256 stableAmount) external onlyRouter nonReentrant {
         require(user != address(0), "ZERO_ADDRESS");
         require(stableAmount > 0, "ZERO_AMOUNT");
+
+        if (!queued[user]) {
+            queued[user] = true;
+            queue.push(user);
+            emit ReservationQueued(user);
+        }
 
         stable.safeTransferFrom(msg.sender, address(this), stableAmount);
         reservedStable[user] += stableAmount;
@@ -64,8 +78,22 @@ contract ReservationManager is Ownable, ReentrancyGuard {
         reservedStable[msg.sender] = 0;
         createdAt[msg.sender] = 0;
         stable.safeTransfer(msg.sender, amount);
+        _advanceHead();
 
         emit ReservationCancelled(msg.sender, amount);
+    }
+
+    function cancelFor(address user) external onlyRouter nonReentrant {
+        require(user != address(0), "ZERO_ADDRESS");
+        uint256 amount = reservedStable[user];
+        require(amount > 0, "NO_RESERVATION");
+
+        reservedStable[user] = 0;
+        createdAt[user] = 0;
+        stable.safeTransfer(user, amount);
+        _advanceHead();
+
+        emit ReservationCancelled(user, amount);
     }
 
     function releaseStable(address user, uint256 amount, address to) external onlyRouter nonReentrant {
@@ -80,5 +108,21 @@ contract ReservationManager is Ownable, ReentrancyGuard {
         stable.safeTransfer(to, amount);
 
         emit ReservationReleased(user, amount, to);
+    }
+
+    function nextReservation() external onlyRouter returns (address user, uint256 amount) {
+        _advanceHead();
+        if (queueHead >= queue.length) {
+            return (address(0), 0);
+        }
+        user = queue[queueHead];
+        amount = reservedStable[user];
+    }
+
+    function _advanceHead() internal {
+        while (queueHead < queue.length && reservedStable[queue[queueHead]] == 0) {
+            queued[queue[queueHead]] = false;
+            queueHead++;
+        }
     }
 }

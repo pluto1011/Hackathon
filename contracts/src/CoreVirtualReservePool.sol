@@ -10,22 +10,27 @@ contract CoreVirtualReservePool is Ownable, ReentrancyGuard {
     using TransferHelper for IERC20;
 
     uint256 public constant BPS = 10_000;
+    uint256 public constant POOL_DURATION = 6 hours;
+    uint256 public constant MIN_INITIAL_RWA_BPS = 200;
+    uint256 public constant MAX_PRICE_MOVE_BPS = 3_000;
+    uint256 private constant FIXED_ONE = 1e18;
+    uint256 private constant PRICE_UP_BPS = BPS + MAX_PRICE_MOVE_BPS;
 
     IERC20 public immutable rwa;
     IERC20 public immutable stable;
+    address public immutable creator;
+    uint256 public immutable expiresAt;
 
     address public router;
     uint256 public vRwa;
     uint256 public vStable;
     uint256 public feeBps;
     bool public virtualsInitialized;
-
-    mapping(address => bool) public suppliers;
+    bool public liquidityInitialized;
 
     event RouterUpdated(address indexed router);
     event VirtualReservesUpdated(uint256 vRwa, uint256 vStable);
     event FeeUpdated(uint256 feeBps);
-    event SupplierUpdated(address indexed supplier, bool enabled);
     event LiquidityAdded(address indexed provider, uint256 rwaIn, uint256 stableIn);
     event LiquidityRemoved(address indexed provider, uint256 rwaOut, uint256 stableOut);
     event SwapExecuted(
@@ -54,13 +59,12 @@ contract CoreVirtualReservePool is Ownable, ReentrancyGuard {
         require(_feeBps < BPS, "FEE_TOO_HIGH");
         rwa = _rwa;
         stable = _stable;
+        creator = msg.sender;
+        expiresAt = block.timestamp + POOL_DURATION;
         router = _router;
         feeBps = _feeBps;
         vRwa = _vRwa;
         vStable = _vStable;
-        if (_vRwa > 0 || _vStable > 0) {
-            virtualsInitialized = true;
-        }
     }
 
     function setRouter(address _router) external onlyOwner {
@@ -69,12 +73,9 @@ contract CoreVirtualReservePool is Ownable, ReentrancyGuard {
         emit RouterUpdated(_router);
     }
 
-    function setVirtualReserves(uint256 _vRwa, uint256 _vStable) external {
-        if (virtualsInitialized) {
-            require(msg.sender == owner, "NOT_OWNER");
-        } else {
-            virtualsInitialized = true;
-        }
+    function setVirtualReserves(uint256 _vRwa, uint256 _vStable) external onlyOwner {
+        require(!liquidityInitialized, "LOCKED");
+        virtualsInitialized = true;
         vRwa = _vRwa;
         vStable = _vStable;
         emit VirtualReservesUpdated(_vRwa, _vStable);
@@ -84,11 +85,6 @@ contract CoreVirtualReservePool is Ownable, ReentrancyGuard {
         require(_feeBps < BPS, "FEE_TOO_HIGH");
         feeBps = _feeBps;
         emit FeeUpdated(_feeBps);
-    }
-
-    function setSupplier(address supplier, bool enabled) external onlyOwner {
-        suppliers[supplier] = enabled;
-        emit SupplierUpdated(supplier, enabled);
     }
 
     function getRealReserves() public view returns (uint256 realRwa, uint256 realStable) {
@@ -111,6 +107,7 @@ contract CoreVirtualReservePool is Ownable, ReentrancyGuard {
         view
         returns (uint256 amountOut, uint256 maxFillOut, uint256 priceImpactBps)
     {
+        require(liquidityInitialized, "NOT_INITIALIZED");
         require(amountIn > 0, "ZERO_AMOUNT");
         (uint256 eRwa, uint256 eStable) = getEffectiveReserves();
         (uint256 realRwa, uint256 realStable) = getRealReserves();
@@ -129,6 +126,15 @@ contract CoreVirtualReservePool is Ownable, ReentrancyGuard {
     function addLiquidity(uint256 rwaAmount, uint256 stableAmount) external nonReentrant {
         require(rwaAmount > 0 || stableAmount > 0, "ZERO_LIQUIDITY");
 
+        bool isInit = !liquidityInitialized;
+        if (isInit) {
+            require(msg.sender == creator, "CREATOR_ONLY");
+            uint256 minRwa = (rwa.totalSupply() * MIN_INITIAL_RWA_BPS + BPS - 1) / BPS;
+            require(rwaAmount > 0, "ZERO_RWA");
+            require(rwaAmount >= minRwa, "MIN_RWA");
+            require(stableAmount > 0, "ZERO_STABLE");
+        }
+
         if (rwaAmount > 0) {
             rwa.safeTransferFrom(msg.sender, address(this), rwaAmount);
         }
@@ -136,11 +142,21 @@ contract CoreVirtualReservePool is Ownable, ReentrancyGuard {
             stable.safeTransferFrom(msg.sender, address(this), stableAmount);
         }
 
+        if (isInit) {
+            liquidityInitialized = true;
+            (uint256 realRwa, uint256 realStable) = getRealReserves();
+            (vRwa, vStable) = _calcVirtualReserves(realRwa, realStable);
+            virtualsInitialized = true;
+            emit VirtualReservesUpdated(vRwa, vStable);
+        }
+
         emit LiquidityAdded(msg.sender, rwaAmount, stableAmount);
     }
 
     function removeLiquidity(uint256 rwaAmount, uint256 stableAmount, address to) external nonReentrant {
-        require(suppliers[msg.sender], "NOT_SUPPLIER");
+        if (msg.sender == creator) {
+            require(block.timestamp >= expiresAt, "CREATOR_LOCKED");
+        }
         require(to != address(0), "ZERO_ADDRESS");
         require(rwaAmount > 0 || stableAmount > 0, "ZERO_LIQUIDITY");
 
@@ -160,6 +176,8 @@ contract CoreVirtualReservePool is Ownable, ReentrancyGuard {
         nonReentrant
         returns (uint256 amountOutFilled, uint256 amountInUsed)
     {
+        require(liquidityInitialized, "NOT_INITIALIZED");
+        require(block.timestamp < expiresAt, "POOL_EXPIRED");
         require(amountIn > 0, "ZERO_AMOUNT");
         require(to != address(0), "ZERO_ADDRESS");
 
@@ -245,5 +263,37 @@ contract CoreVirtualReservePool is Ownable, ReentrancyGuard {
 
     function _min(uint256 a, uint256 b) internal pure returns (uint256) {
         return a < b ? a : b;
+    }
+
+    function _calcVirtualReserves(uint256 realRwa, uint256 realStable)
+        internal
+        pure
+        returns (uint256 vRwaCalc, uint256 vStableCalc)
+    {
+        uint256 up = (PRICE_UP_BPS * FIXED_ONE) / BPS;
+        uint256 rUp = _sqrt(up * FIXED_ONE);
+
+        vRwaCalc = _divCeil(realRwa * FIXED_ONE, rUp - FIXED_ONE);
+        vStableCalc = _divCeil(realStable * vRwaCalc, realRwa);
+    }
+
+    function _divCeil(uint256 numerator, uint256 denominator) internal pure returns (uint256) {
+        if (numerator == 0) {
+            return 0;
+        }
+        return (numerator - 1) / denominator + 1;
+    }
+
+    function _sqrt(uint256 y) internal pure returns (uint256 z) {
+        if (y == 0) {
+            return 0;
+        }
+        uint256 x = y;
+        z = (x + 1) / 2;
+        while (z < x) {
+            x = z;
+            z = (y / z + z) / 2;
+        }
+        return x;
     }
 }

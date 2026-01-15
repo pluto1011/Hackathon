@@ -15,6 +15,22 @@
 - `DerivedSpotPool`: UI/UX용 얇은 래퍼(무한 파생 페어 제공)
 - `DerivedSpotPoolFactory`: baseToken별 DerivedSpotPool 생성
 
+## 풀 라이프사이클
+- 풀 만기: 배포 시점 + 6시간
+- 만기 이후 스왑 불가, 만기 이후부터 생성자 출금 허용
+- 최초 유동성은 풀 생성자가 RWA totalSupply의 2% 이상 + stable > 0로 제공해야 함
+- 최초 유동성 이후에는 누구나 유동성 입출금 가능
+- 가상 리저브는 초기 가격을 유지하도록 RWA/Stable 비율로 자동 계산되며, 변동폭이 ±30%를 넘지 않도록 제한
+- `setVirtualReserves`는 초기화 이후 호출 불가(자동 계산 값이 기준)
+
+## 예약 대기열(Quote Queue)
+- 스왑이 캡에 걸리면 초과 Stable이 ReservationManager에 적립되고 대기열에 등록됨
+- 대기열은 FIFO로 처리되며, `LiquidityHubRouter.processQueue(maxUsers)`가 앞에서부터 처리
+- 만기 이후에는 `LiquidityHubRouter.purgeExpiredQuotes(maxUsers)`로 예약이 취소되고 환불됨
+- 예약 취소 시 즉시 환불되며, 취소된 항목은 대기열에서 자동으로 건너뜀
+- `processQueue/purgeExpiredQuotes`는 누구나 호출 가능
+- `maxUsers`는 한 번에 처리할 항목 수(가스 제한용), 필요 시 반복 호출
+
 ## 아키텍처
 ```mermaid
 flowchart LR
@@ -32,7 +48,7 @@ flowchart LR
     DerivedSpotPoolFactory -->|create| DerivedSpotPool
 
     LPs -->|add liquidity| CoreVirtualReservePool
-    Suppliers -->|remove liquidity| CoreVirtualReservePool
+    LPs -->|remove liquidity| CoreVirtualReservePool
     Owner -->|config| CoreVirtualReservePool
     Owner -->|set adapters| LiquidityHubRouter
     Owner -->|set router/ttl| ReservationManager
@@ -59,11 +75,18 @@ flowchart LR
   - 내부 동작: Router의 `swapToRwaExactIn` 호출로 위임
 - `LiquidityHubRouter.swapToRwaExactIn(tokenIn, amountIn, minRwaOut, recipient, allowReserve)`
   - 사용처: 실제 스왑 오케스트레이션
-  - 동작 요약: 어댑터로 stable 확보 → Core에 스왑 → 초과분 예약/환불
+  - 동작 요약: 예약 대기열 우선 처리 → 어댑터로 stable 확보 → Core에 스왑 → 초과분 예약/환불
 - `LiquidityHubRouter.claimReservation(minRwaOut, recipient)`
   - 사용처: 예약된 Stable로 추후 RWA 체결
+  - 제한: 대기열 맨 앞 사용자만 가능
 - `LiquidityHubRouter.cancelReservation()`
   - 사용처: 예약된 Stable 취소 및 환불
+- `LiquidityHubRouter.cancelReservationFor(user)`
+  - 사용처: 본인 또는 owner가 예약 취소/환불
+- `LiquidityHubRouter.processQueue(maxUsers)`
+  - 사용처: 유동성 공급 이후 대기열 스왑을 우선 처리
+- `LiquidityHubRouter.purgeExpiredQuotes(maxUsers)`
+  - 사용처: 만기 이후 대기열 정리 및 환불
 
 참고: `CoreVirtualReservePool.swapExactIn`은 Router만 호출 가능(유저 직접 호출 불가)입니다.
 
@@ -82,9 +105,13 @@ flowchart LR
 ### TX 함수
 - `CoreVirtualReservePool.addLiquidity(rwaAmount, stableAmount)`
   - 사용처: 풀 유동성 공급(입금)
+  - 제한: 최초 유동성은 생성자만 가능 + RWA totalSupply의 2% 이상 + stable > 0 필요
 - `CoreVirtualReservePool.removeLiquidity(rwaAmount, stableAmount, to)`
   - 사용처: 유동성 회수(출금)
-  - 제한: `suppliers`로 등록된 주소만 가능
+  - 제한: 풀 생성자는 만기 전 출금 불가
+
+참고:
+- 풀 만기 이후에는 swap 불가 (대기열 예약은 purge로 소멸)
 
 ## (선택) Derived Pool 생성자 인터랙션
 

@@ -38,7 +38,6 @@ contract Deploy is Script {
 
         router.setAdapter(address(weth), address(adapter), true);
 
-        core.setSupplier(msg.sender, true);
         stable.mint(msg.sender, 1_000_000 ether);
         rwa.mint(msg.sender, 100_000 ether);
         stable.approve(address(core), 1_000_000 ether);

@@ -2,6 +2,9 @@
   {"inputs":[],"name":"rwa","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},
   {"inputs":[],"name":"stable","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},
   {"inputs":[],"name":"feeBps","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+  {"inputs":[],"name":"creator","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},
+  {"inputs":[],"name":"expiresAt","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+  {"inputs":[],"name":"liquidityInitialized","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"view","type":"function"},
   {"inputs":[],"name":"getRealReserves","outputs":[{"internalType":"uint256","name":"realRwa","type":"uint256"},{"internalType":"uint256","name":"realStable","type":"uint256"}],"stateMutability":"view","type":"function"},
   {"inputs":[],"name":"getVirtualReserves","outputs":[{"internalType":"uint256","name":"","type":"uint256"},{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
   {"inputs":[],"name":"getEffectiveReserves","outputs":[{"internalType":"uint256","name":"eRwa","type":"uint256"},{"internalType":"uint256","name":"eStable","type":"uint256"}],"stateMutability":"view","type":"function"},
@@ -9,6 +12,5 @@
   {"inputs":[{"internalType":"uint256","name":"rwaAmount","type":"uint256"},{"internalType":"uint256","name":"stableAmount","type":"uint256"}],"name":"addLiquidity","outputs":[],"stateMutability":"nonpayable","type":"function"},
   {"inputs":[{"internalType":"address","name":"tokenIn","type":"address"},{"internalType":"uint256","name":"amountIn","type":"uint256"},{"internalType":"uint256","name":"minOut","type":"uint256"},{"internalType":"address","name":"to","type":"address"}],"name":"swapExactIn","outputs":[{"internalType":"uint256","name":"amountOutFilled","type":"uint256"},{"internalType":"uint256","name":"amountInUsed","type":"uint256"}],"stateMutability":"nonpayable","type":"function"},
   {"inputs":[{"internalType":"uint256","name":"_vRwa","type":"uint256"},{"internalType":"uint256","name":"_vStable","type":"uint256"}],"name":"setVirtualReserves","outputs":[],"stateMutability":"nonpayable","type":"function"},
-  {"inputs":[{"internalType":"uint256","name":"_feeBps","type":"uint256"}],"name":"setFeeBps","outputs":[],"stateMutability":"nonpayable","type":"function"},
-  {"inputs":[{"internalType":"address","name":"supplier","type":"address"},{"internalType":"bool","name":"enabled","type":"bool"}],"name":"setSupplier","outputs":[],"stateMutability":"nonpayable","type":"function"}
+  {"inputs":[{"internalType":"uint256","name":"_feeBps","type":"uint256"}],"name":"setFeeBps","outputs":[],"stateMutability":"nonpayable","type":"function"}
 ]

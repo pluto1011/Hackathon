@@ -12,6 +12,13 @@
 - Quotes/풀 상태/관리자 액션을 제공하는 Backend API
 - 스왑/예약/클레임을 시연하는 Frontend 데모
 
+## 풀 라이프사이클
+- 풀 만기: 배포 시점 + 6시간 (만기 이후 swap 불가)
+- 최초 유동성은 생성자가 RWA totalSupply의 2% 이상 + stable > 0로 제공해야 함
+- 최초 유동성 이후에는 누구나 입출금 가능, 단 생성자는 만기 전 출금 불가
+- 가상 리저브는 초기 가격 비율을 유지하면서 변동폭이 ±30%를 넘지 않도록 자동 계산
+- 예약(quote) 대기열은 유동성 투입 후 `processQueue`로 우선 처리, 만기 이후에는 purge로 소멸
+
 ## 아키텍처
 ```mermaid
 flowchart LR
@@ -26,6 +33,7 @@ flowchart LR
 
 ## 문서
 - `docs/protocol-guide.md` (프로토콜 설명 + 아키텍처 + 사용자/LP 함수 정리)
+- `docs/protocol.md` (프로토콜 규칙 + 프론트 연동 함수 목록)
 
 ## 컨트랙트 (Foundry)
 - `contracts/src/CoreVirtualReservePool.sol`
@@ -66,7 +74,6 @@ npm run dev
 - `GET /reservation/:user`
 - `POST /admin/virtual-reserves`
 - `POST /admin/fee`
-- `POST /admin/supplier`
 - `POST /admin/adapter`
 
 ## Frontend
