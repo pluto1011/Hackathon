@@ -14,7 +14,6 @@ contract CoreVirtualReservePool is Ownable, ReentrancyGuard {
     uint256 public constant MIN_INITIAL_RWA_BPS = 200;
     uint256 public constant MAX_PRICE_MOVE_BPS = 3_000;
     uint256 private constant FIXED_ONE = 1e18;
-    uint256 private constant PRICE_UP_BPS = BPS + MAX_PRICE_MOVE_BPS;
 
     IERC20 public immutable rwa;
     IERC20 public immutable stable;
@@ -25,12 +24,14 @@ contract CoreVirtualReservePool is Ownable, ReentrancyGuard {
     uint256 public vRwa;
     uint256 public vStable;
     uint256 public feeBps;
+    uint256 public maxPriceMoveBps;
     bool public virtualsInitialized;
     bool public liquidityInitialized;
 
     event RouterUpdated(address indexed router);
     event VirtualReservesUpdated(uint256 vRwa, uint256 vStable);
     event FeeUpdated(uint256 feeBps);
+    event MaxPriceMoveUpdated(uint256 maxPriceMoveBps);
     event LiquidityAdded(address indexed provider, uint256 rwaIn, uint256 stableIn);
     event LiquidityRemoved(address indexed provider, uint256 rwaOut, uint256 stableOut);
     event SwapExecuted(
@@ -65,6 +66,7 @@ contract CoreVirtualReservePool is Ownable, ReentrancyGuard {
         feeBps = _feeBps;
         vRwa = _vRwa;
         vStable = _vStable;
+        maxPriceMoveBps = MAX_PRICE_MOVE_BPS;
     }
 
     function setRouter(address _router) external onlyOwner {
@@ -85,6 +87,13 @@ contract CoreVirtualReservePool is Ownable, ReentrancyGuard {
         require(_feeBps < BPS, "FEE_TOO_HIGH");
         feeBps = _feeBps;
         emit FeeUpdated(_feeBps);
+    }
+
+    function setMaxPriceMoveBps(uint256 _maxPriceMoveBps) external onlyOwner {
+        require(!liquidityInitialized, "LOCKED");
+        require(_maxPriceMoveBps > 0 && _maxPriceMoveBps <= BPS, "INVALID_BPS");
+        maxPriceMoveBps = _maxPriceMoveBps;
+        emit MaxPriceMoveUpdated(_maxPriceMoveBps);
     }
 
     function getRealReserves() public view returns (uint256 realRwa, uint256 realStable) {
@@ -144,10 +153,12 @@ contract CoreVirtualReservePool is Ownable, ReentrancyGuard {
 
         if (isInit) {
             liquidityInitialized = true;
-            (uint256 realRwa, uint256 realStable) = getRealReserves();
-            (vRwa, vStable) = _calcVirtualReserves(realRwa, realStable);
-            virtualsInitialized = true;
-            emit VirtualReservesUpdated(vRwa, vStable);
+            if (!virtualsInitialized) {
+                (uint256 realRwa, uint256 realStable) = getRealReserves();
+                (vRwa, vStable) = _calcVirtualReserves(realRwa, realStable, maxPriceMoveBps);
+                virtualsInitialized = true;
+                emit VirtualReservesUpdated(vRwa, vStable);
+            }
         }
 
         emit LiquidityAdded(msg.sender, rwaAmount, stableAmount);
@@ -265,12 +276,12 @@ contract CoreVirtualReservePool is Ownable, ReentrancyGuard {
         return a < b ? a : b;
     }
 
-    function _calcVirtualReserves(uint256 realRwa, uint256 realStable)
+    function _calcVirtualReserves(uint256 realRwa, uint256 realStable, uint256 priceMoveBps)
         internal
         pure
         returns (uint256 vRwaCalc, uint256 vStableCalc)
     {
-        uint256 up = (PRICE_UP_BPS * FIXED_ONE) / BPS;
+        uint256 up = ((BPS + priceMoveBps) * FIXED_ONE) / BPS;
         uint256 rUp = _sqrt(up * FIXED_ONE);
 
         vRwaCalc = _divCeil(realRwa * FIXED_ONE, rUp - FIXED_ONE);

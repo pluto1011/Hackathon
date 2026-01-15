@@ -20,8 +20,8 @@
 - 만기 이후 스왑 불가, 만기 이후부터 생성자 출금 허용
 - 최초 유동성은 풀 생성자가 RWA totalSupply의 2% 이상 + stable > 0로 제공해야 함
 - 최초 유동성 이후에는 누구나 유동성 입출금 가능
-- 가상 리저브는 초기 가격을 유지하도록 RWA/Stable 비율로 자동 계산되며, 변동폭이 ±30%를 넘지 않도록 제한
-- `setVirtualReserves`는 초기화 이후 호출 불가(자동 계산 값이 기준)
+- 가상 리저브는 초기 가격을 유지하도록 RWA/Stable 비율로 자동 계산되며, 기본 변동폭은 ±30% (초기화 전 설정 가능)
+- `setVirtualReserves`, `setMaxPriceMoveBps`는 초기화 전만 가능 (수동 설정 시 자동 계산을 건너뜀)
 
 ## 예약 대기열(Quote Queue)
 - 스왑이 캡에 걸리면 초과 Stable이 ReservationManager에 적립되고 대기열에 등록됨

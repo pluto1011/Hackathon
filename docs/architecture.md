@@ -16,8 +16,8 @@ Cap:
 If capped, router sends leftover stable to `ReservationManager`.
 
 Virtual reserves policy:
-- Auto-calculated on initial liquidity to cap max price deviation to ±30% when one side is depleted.
-- `vRwa >= realRwa / (sqrt(1.3) - 1)`, `vStable`는 초기 가격 유지를 위해 `realStable/realRwa` 비율로 맞춤
+- Auto-calculated on initial liquidity to cap max price deviation to default ±30% (configurable pre-init).
+- `vRwa >= realRwa / (sqrt(1 + maxMove) - 1)`, `vStable`는 초기 가격 유지를 위해 `realStable/realRwa` 비율로 맞춤
 
 ## Pool Lifetime
 - Pool expires at `deployment + 6 hours`.

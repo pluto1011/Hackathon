@@ -2,6 +2,8 @@
 
 * [RWA Liquidity Hub Docs](README.md)
 * [User Guide](user-guide.md)
+* [기술/참여 가이드](technical-participation.md)
+* [피치 비디오 대본](pitch-video.md)
 * [Protocol Guide](protocol-guide.md)
 * [Protocol Summary](protocol.md)
 * [Architecture Notes](architecture.md)

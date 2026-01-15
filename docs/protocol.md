@@ -7,7 +7,7 @@
 - 풀 만기: 배포 시점 + 6시간 (`expiresAt`)
 - 만기 이후: `swap` 불가, 예약은 `purge`로 소멸(환불)
 - 최초 유동성: 풀 생성자만 가능, RWA totalSupply의 2% 이상 + stable > 0
-- 가상 리저브: 초기 가격 비율 유지 + 가격 변동폭이 ±30%를 넘지 않도록 자동 계산
+- 가상 리저브: 초기 가격 비율 유지 + 가격 변동폭이 기본 ±30% (설정 가능)로 제한되도록 자동 계산
 - 예약 대기열: FIFO, 유동성 유입 시 대기열 우선 처리
 
 ## 컨트랙트 역할
@@ -20,9 +20,10 @@
 
 ## 가격/가상 리저브 정책
 - 초기 가격 `P0 = realStable / realRwa`
-- RWA가 모두 소진될 때 가격이 `P0 * 1.3`을 넘지 않도록 가상 리저브 계산
+- `maxMove = maxPriceMoveBps / BPS` (기본 0.3)
+- RWA가 모두 소진될 때 가격이 `P0 * (1 + maxMove)`를 넘지 않도록 가상 리저브 계산
 - 실제 적용:
-  - `vRwa = ceil(realRwa / (sqrt(1.3) - 1))`
+  - `vRwa = ceil(realRwa / (sqrt(1 + maxMove) - 1))`
   - `vStable = ceil(realStable * vRwa / realRwa)` (초기 가격 비율 유지)
 
 ## 스왑 & 예약 흐름
@@ -63,7 +64,7 @@
   - `getRealReserves()`
   - `getVirtualReserves()`
   - `getEffectiveReserves()`
-  - `feeBps()`, `vRwa()`, `vStable()`
+  - `feeBps()`, `vRwa()`, `vStable()`, `maxPriceMoveBps()`
   - `creator()`, `expiresAt()`, `liquidityInitialized()`
 - Router
   - `core()`, `reservations()`, `stable()`, `rwa()`
@@ -80,7 +81,9 @@
 - `ReservationManager.setRouter(router)`
 - `ReservationManager.setTtl(ttl)`
 - `CoreVirtualReservePool.setVirtualReserves(vRwa, vStable)`  
-  - 초기화 전만 가능하며, 초기 유동성 시 자동 계산 값으로 덮어써짐
+  - 초기화 전만 가능, 수동 설정 시 자동 계산을 건너뜀
+- `CoreVirtualReservePool.setMaxPriceMoveBps(maxPriceMoveBps)`  
+  - 초기화 전만 가능, 기본값은 30%
 
 ### 6) Backend API (선택, 프론트에서 호출 시)
 - `GET /config` 계약 주소/체인 정보
