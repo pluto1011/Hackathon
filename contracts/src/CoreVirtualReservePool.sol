@@ -18,6 +18,7 @@ contract CoreVirtualReservePool is Ownable, ReentrancyGuard {
     IERC20 public immutable rwa;
     IERC20 public immutable stable;
     address public immutable creator;
+    address public immutable liquiditySeeder;
     uint256 public immutable expiresAt;
 
     address public router;
@@ -54,13 +55,17 @@ contract CoreVirtualReservePool is Ownable, ReentrancyGuard {
         address _router,
         uint256 _feeBps,
         uint256 _vRwa,
-        uint256 _vStable
+        uint256 _vStable,
+        address _creator,
+        address _liquiditySeeder
     ) {
         require(address(_rwa) != address(0) && address(_stable) != address(0), "ZERO_TOKEN");
         require(_feeBps < BPS, "FEE_TOO_HIGH");
+        require(_creator != address(0), "ZERO_CREATOR");
         rwa = _rwa;
         stable = _stable;
-        creator = msg.sender;
+        creator = _creator;
+        liquiditySeeder = _liquiditySeeder;
         expiresAt = block.timestamp + POOL_DURATION;
         router = _router;
         feeBps = _feeBps;
@@ -137,7 +142,8 @@ contract CoreVirtualReservePool is Ownable, ReentrancyGuard {
 
         bool isInit = !liquidityInitialized;
         if (isInit) {
-            require(msg.sender == creator, "CREATOR_ONLY");
+            bool isSeeder = liquiditySeeder != address(0) && msg.sender == liquiditySeeder;
+            require(msg.sender == creator || isSeeder, "CREATOR_ONLY");
             uint256 minRwa = (rwa.totalSupply() * MIN_INITIAL_RWA_BPS + BPS - 1) / BPS;
             require(rwaAmount > 0, "ZERO_RWA");
             require(rwaAmount >= minRwa, "MIN_RWA");

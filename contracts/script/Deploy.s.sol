@@ -2,12 +2,14 @@
 pragma solidity ^0.8.20;
 
 import "forge-std/Script.sol";
-import {CoreVirtualReservePool} from "../src/CoreVirtualReservePool.sol";
-import {ReservationManager} from "../src/ReservationManager.sol";
 import {LiquidityHubRouter} from "../src/LiquidityHubRouter.sol";
-import {DerivedSpotPoolFactory} from "../src/DerivedSpotPoolFactory.sol";
+import {LiquidityHubFactory} from "../src/LiquidityHubFactory.sol";
 import {MockSwapAdapter} from "../src/MockSwapAdapter.sol";
 import {MockERC20} from "../src/MockERC20.sol";
+import {CoreDeployer} from "../src/CoreDeployer.sol";
+import {ReservationManagerDeployer} from "../src/ReservationManagerDeployer.sol";
+import {LiquidityHubRouterDeployer} from "../src/LiquidityHubRouterDeployer.sol";
+import {DerivedSpotPoolFactoryDeployer} from "../src/DerivedSpotPoolFactoryDeployer.sol";
 
 contract Deploy is Script {
     function run() external {
@@ -17,32 +19,43 @@ contract Deploy is Script {
         MockERC20 rwa = new MockERC20("Mock RWA", "mRWA", 18);
         MockERC20 weth = new MockERC20("Wrapped ETH", "WETH", 18);
 
-        CoreVirtualReservePool core = new CoreVirtualReservePool(
-            rwa,
-            stable,
-            address(0),
-            30,
-            0,
-            0
+        CoreDeployer coreDeployer = new CoreDeployer();
+        ReservationManagerDeployer reservationDeployer = new ReservationManagerDeployer();
+        LiquidityHubRouterDeployer routerDeployer = new LiquidityHubRouterDeployer();
+        DerivedSpotPoolFactoryDeployer derivedFactoryDeployer = new DerivedSpotPoolFactoryDeployer();
+
+        LiquidityHubFactory hubFactory = new LiquidityHubFactory(
+            coreDeployer,
+            reservationDeployer,
+            routerDeployer,
+            derivedFactoryDeployer
         );
-        ReservationManager reservations = new ReservationManager(stable, address(0));
-        LiquidityHubRouter router = new LiquidityHubRouter(core, reservations);
 
-        core.setRouter(address(router));
-        reservations.setRouter(address(router));
+        stable.mint(msg.sender, 1_000_000 ether);
+        rwa.mint(msg.sender, 100_000 ether);
+        stable.approve(address(hubFactory), 1_000_000 ether);
+        rwa.approve(address(hubFactory), 100_000 ether);
 
-        DerivedSpotPoolFactory factory = new DerivedSpotPoolFactory(router);
+        LiquidityHubFactory.HubParams memory params = LiquidityHubFactory.HubParams({
+            rwa: rwa,
+            stable: stable,
+            feeBps: 30,
+            maxPriceMoveBps: 0,
+            vRwa: 0,
+            vStable: 0
+        });
+
+        (, , address routerAddr, ) = hubFactory.createHubAndSeed(
+            params,
+            100_000 ether,
+            1_000_000 ether
+        );
+        LiquidityHubRouter router = LiquidityHubRouter(routerAddr);
 
         MockSwapAdapter adapter = new MockSwapAdapter(stable);
         adapter.setRate(address(weth), 1_000 ether);
 
         router.setAdapter(address(weth), address(adapter), true);
-
-        stable.mint(msg.sender, 1_000_000 ether);
-        rwa.mint(msg.sender, 100_000 ether);
-        stable.approve(address(core), 1_000_000 ether);
-        rwa.approve(address(core), 100_000 ether);
-        core.addLiquidity(100_000 ether, 1_000_000 ether);
 
         vm.stopBroadcast();
     }
